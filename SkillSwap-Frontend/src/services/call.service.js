@@ -1,56 +1,7 @@
 import API from '../APIs/api';
 
 class CallService {
-    constructor() {
-        this.socket = null;
-        this.callbacks = {
-            onIncomingCall: null,
-            onCallAccepted: null,
-            onCallRejected: null,
-            onCallEnded: null,
-            onCallError: null,
-            onSignalingMessage: null
-        };
-    }
-
-    // Initialize WebSocket connection for signaling
-    initializeSocket(userId) {
-        if (this.socket) {
-            this.socket.close();
-        }
-
-        // For now, we'll use polling. In production, use WebSocket
-        this.socket = {
-            connected: true,
-            userId: userId
-        };
-
-        console.log('Call signaling initialized for user:', userId);
-    }
-
-    // Send signaling message
-    async sendSignalingMessage(message) {
-        if (!this.socket || !this.socket.connected) {
-            console.error('Socket not connected');
-            return;
-        }
-
-        try {
-            // Send signaling data to backend
-            if (message.callId) {
-                await API.post(`/calls/${message.callId}/signaling`, {
-                    type: message.type,
-                    data: message.offer || message.answer || message.candidate
-                });
-            }
-            
-            console.log('Signaling message sent:', message);
-        } catch (error) {
-            console.error('Error sending signaling message:', error);
-        }
-    }
-
-    // Start a call
+    // Start a call (REST – creates DB record)
     async startCall(chatId, recipientId, isVideoCall = true) {
         try {
             const response = await API.post('/calls/start', {
@@ -58,7 +9,6 @@ class CallService {
                 recipientId,
                 isVideoCall
             });
-
             return {
                 success: true,
                 data: response.data,
@@ -73,13 +23,10 @@ class CallService {
         }
     }
 
-    // Answer a call
+    // Answer a call (REST – updates DB record)
     async answerCall(callId, accept = true) {
         try {
-            const response = await API.post(`/calls/${callId}/answer`, {
-                accept
-            });
-
+            const response = await API.post(`/calls/${callId}/answer`, { accept });
             return {
                 success: true,
                 data: response.data,
@@ -94,11 +41,10 @@ class CallService {
         }
     }
 
-    // End a call
+    // End a call (REST – updates DB record)
     async endCall(callId) {
         try {
             const response = await API.post(`/calls/${callId}/end`);
-
             return {
                 success: true,
                 data: response.data,
@@ -117,7 +63,6 @@ class CallService {
     async getActiveCalls() {
         try {
             const response = await API.get('/calls/active');
-
             return {
                 success: true,
                 data: response.data.calls
@@ -131,18 +76,49 @@ class CallService {
         }
     }
 
-    // Set callbacks
-    setCallbacks(callbacks) {
-        this.callbacks = { ...this.callbacks, ...callbacks };
+    // ── WebRTC Signaling (via real Socket.IO) ─────────────────────────────────
+
+    // Notify recipient of an incoming call
+    notifyIncomingCall(socket, { recipientId, callId, isVideoCall }) {
+        if (!socket) return;
+        socket.emit('call:initiate', { recipientId, callId, isVideoCall });
     }
 
-    // Cleanup
-    cleanup() {
-        if (this.socket) {
-            this.socket.close();
-            this.socket = null;
-        }
+    // Notify caller that call was accepted
+    notifyCallAccepted(socket, { callId, callerId }) {
+        if (!socket) return;
+        socket.emit('call:accepted', { callId, callerId });
+    }
+
+    // Notify caller that call was rejected
+    notifyCallRejected(socket, { callId, callerId }) {
+        if (!socket) return;
+        socket.emit('call:rejected', { callId, callerId });
+    }
+
+    // Send WebRTC offer SDP
+    sendOffer(socket, { offer, recipientId, callId }) {
+        if (!socket) return;
+        socket.emit('call:offer', { offer, recipientId, callId });
+    }
+
+    // Send WebRTC answer SDP
+    sendAnswer(socket, { answer, callerId, callId }) {
+        if (!socket) return;
+        socket.emit('call:answer', { answer, callerId, callId });
+    }
+
+    // Send ICE candidate
+    sendIceCandidate(socket, { candidate, targetUserId, callId }) {
+        if (!socket) return;
+        socket.emit('call:ice-candidate', { candidate, targetUserId, callId });
+    }
+
+    // Notify other party that call has ended
+    notifyCallEnded(socket, { callId, otherUserId }) {
+        if (!socket) return;
+        socket.emit('call:end', { callId, otherUserId });
     }
 }
 
-export default CallService;
+export default new CallService();

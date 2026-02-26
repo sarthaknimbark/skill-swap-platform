@@ -27,7 +27,7 @@ const callRoutes = require("./routes/call.route");
 
 // middleware
 app.use(express.json());
-app.use(express.urlencoded({extended:true}));
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 connectToDB();
 app.use(cors({
@@ -40,14 +40,14 @@ app.use(morgan("dev"));
 io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1];
-    
+
     if (!token) {
       return next(new Error('Authentication error: No token provided'));
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await UserModel.findById(decoded.id).select('_id username');
-    
+
     if (!user) {
       return next(new Error('Authentication error: User not found'));
     }
@@ -63,29 +63,29 @@ io.use(async (socket, next) => {
 // Socket.IO connection handling
 io.on('connection', (socket) => {
   console.log(`User ${socket.username} connected with socket ID: ${socket.id}`);
-  
+
   // Join user to their personal room for direct messages
   socket.join(`user_${socket.userId}`);
-  
+
   // Join chat rooms
   socket.on('join_chat', (chatId) => {
     socket.join(`chat_${chatId}`);
     console.log(`User ${socket.username} joined chat ${chatId}`);
   });
-  
+
   // Leave chat rooms
   socket.on('leave_chat', (chatId) => {
     socket.leave(`chat_${chatId}`);
     console.log(`User ${socket.username} left chat ${chatId}`);
   });
-  
+
   // Handle new messages
   socket.on('new_message', (data) => {
     // Broadcast the message to all users in the chat room
     socket.to(`chat_${data.chatId}`).emit('message_received', data);
     console.log(`Message broadcasted in chat ${data.chatId}:`, data.content);
   });
-  
+
   // Handle typing indicators
   socket.on('typing_start', (data) => {
     socket.to(`chat_${data.chatId}`).emit('user_typing', {
@@ -94,7 +94,7 @@ io.on('connection', (socket) => {
       chatId: data.chatId
     });
   });
-  
+
   socket.on('typing_stop', (data) => {
     socket.to(`chat_${data.chatId}`).emit('user_stopped_typing', {
       userId: socket.userId,
@@ -106,13 +106,88 @@ io.on('connection', (socket) => {
   // Test connection handler
   socket.on('test_connection', (data) => {
     console.log('Test connection received from user:', socket.userId, 'for chat:', data.chatId);
-    socket.emit('test_response', { 
-      message: 'Connection test successful', 
-      userId: socket.userId, 
-      chatId: data.chatId 
+    socket.emit('test_response', {
+      message: 'Connection test successful',
+      userId: socket.userId,
+      chatId: data.chatId
     });
   });
-  
+
+  // ── WebRTC Call Signaling ────────────────────────────────────────────────
+
+  // Caller notifies recipient of an incoming call
+  socket.on('call:initiate', (data) => {
+    // data: { recipientId, callId, isVideoCall, callerUsername }
+    console.log(`Call initiated by ${socket.username} to user ${data.recipientId}`);
+    socket.to(`user_${data.recipientId}`).emit('call:incoming', {
+      callId: data.callId,
+      callerId: socket.userId,
+      callerUsername: socket.username,
+      isVideoCall: data.isVideoCall
+    });
+  });
+
+  // Recipient accepted the call
+  socket.on('call:accepted', (data) => {
+    // data: { callId, callerId }
+    console.log(`Call ${data.callId} accepted by ${socket.username}`);
+    socket.to(`user_${data.callerId}`).emit('call:accepted', {
+      callId: data.callId,
+      recipientId: socket.userId
+    });
+  });
+
+  // Recipient rejected the call
+  socket.on('call:rejected', (data) => {
+    // data: { callId, callerId }
+    console.log(`Call ${data.callId} rejected by ${socket.username}`);
+    socket.to(`user_${data.callerId}`).emit('call:rejected', {
+      callId: data.callId
+    });
+  });
+
+  // Relay WebRTC offer SDP
+  socket.on('call:offer', (data) => {
+    // data: { offer, recipientId, callId }
+    console.log(`Relaying WebRTC offer to user ${data.recipientId}`);
+    socket.to(`user_${data.recipientId}`).emit('call:offer', {
+      offer: data.offer,
+      callId: data.callId,
+      callerId: socket.userId
+    });
+  });
+
+  // Relay WebRTC answer SDP
+  socket.on('call:answer', (data) => {
+    // data: { answer, callerId, callId }
+    console.log(`Relaying WebRTC answer to user ${data.callerId}`);
+    socket.to(`user_${data.callerId}`).emit('call:answer', {
+      answer: data.answer,
+      callId: data.callId
+    });
+  });
+
+  // Relay ICE candidates
+  socket.on('call:ice-candidate', (data) => {
+    // data: { candidate, targetUserId, callId }
+    socket.to(`user_${data.targetUserId}`).emit('call:ice-candidate', {
+      candidate: data.candidate,
+      callId: data.callId,
+      fromUserId: socket.userId
+    });
+  });
+
+  // One party ended the call
+  socket.on('call:end', (data) => {
+    // data: { callId, otherUserId }
+    console.log(`Call ${data.callId} ended by ${socket.username}`);
+    socket.to(`user_${data.otherUserId}`).emit('call:ended', {
+      callId: data.callId
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+
   // Handle disconnect
   socket.on('disconnect', () => {
     console.log(`User ${socket.username} disconnected`);
@@ -123,11 +198,11 @@ io.on('connection', (socket) => {
 app.set('io', io);
 
 // Use Routes
-app.use("/api/auth",authRoute); 
-app.use("/api/profile",usetProfileRoutes);
-app.use("/api/swap-requests",swapRequestRoutes);
-app.use("/api/chats",chatRoutes);
-app.use("/api/calls",callRoutes);
+app.use("/api/auth", authRoute);
+app.use("/api/profile", usetProfileRoutes);
+app.use("/api/swap-requests", swapRequestRoutes);
+app.use("/api/chats", chatRoutes);
+app.use("/api/calls", callRoutes);
 
 const PORT = process.env.PORT || 3000;
 

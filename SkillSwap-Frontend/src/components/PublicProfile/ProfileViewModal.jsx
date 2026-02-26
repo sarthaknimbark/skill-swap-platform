@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback } from 'react';
-import { X, MapPin, Mail, User, Calendar, Briefcase, Globe, Phone, Award, GraduationCap } from 'lucide-react';
+import { X, MapPin, Mail, User, Calendar, Briefcase, Globe, Phone, Award, GraduationCap, BookOpen } from 'lucide-react';
 
 const ProfileViewModal = ({ profile, isOpen, onClose }) => {
   const handleEscKey = useCallback((event) => {
@@ -27,12 +27,12 @@ const ProfileViewModal = ({ profile, isOpen, onClose }) => {
   };
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-6"
       onClick={handleOverlayClick}
     >
       <div className="bg-white rounded-xl w-full max-w-4xl max-h-[85vh] overflow-hidden shadow-xl">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b bg-gray-50">
           <h2 className="text-lg font-semibold text-gray-900">Professional Profile</h2>
@@ -47,13 +47,13 @@ const ProfileViewModal = ({ profile, isOpen, onClose }) => {
         {/* Content - Scrollable */}
         <div className="overflow-y-auto max-h-[calc(85vh-120px)] scrollbar-thin scrollbar-track-gray-100 scrollbar-thumb-gray-300">
           <div className="p-6">
-            
+
             {/* Profile Header */}
             <div className="flex items-start gap-4 mb-6 pb-6 border-b">
               <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0">
                 <User className="w-8 h-8 text-white" />
               </div>
-              
+
               <div className="flex-1 min-w-0">
                 <h1 className="text-xl font-bold text-gray-900 mb-1 break-words">
                   {profile.fullname || 'Unknown User'}
@@ -61,7 +61,7 @@ const ProfileViewModal = ({ profile, isOpen, onClose }) => {
                 {profile.headline && (
                   <p className="text-gray-600 mb-3 break-words">{profile.headline}</p>
                 )}
-                
+
                 <div className="flex items-center gap-4 text-sm text-gray-500 flex-wrap">
                   {profile.location && (
                     <div className="flex items-center">
@@ -80,10 +80,10 @@ const ProfileViewModal = ({ profile, isOpen, onClose }) => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              
+
               {/* Main Content */}
               <div className="lg:col-span-2 space-y-6">
-                
+
                 {/* About - Fixed overflow */}
                 {profile.aboutMe && (
                   <div>
@@ -157,19 +157,39 @@ const ProfileViewModal = ({ profile, isOpen, onClose }) => {
 
               {/* Sidebar */}
               <div className="space-y-6">
-                
-                {/* Skills */}
-                {profile.skills && profile.skills.length > 0 && (
+
+                {/* Skills I Offer */}
+                {profile.skillsOffered && profile.skillsOffered.length > 0 && (
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
-                      <Award className="w-4 h-4 mr-2" />
-                      Skills
+                      <Award className="w-4 h-4 mr-2 text-green-600" />
+                      Skills I Offer
                     </h3>
                     <div className="flex flex-wrap gap-2">
-                      {profile.skills.map((skill, index) => (
+                      {profile.skillsOffered.map((skill, index) => (
                         <span
                           key={index}
-                          className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium break-words"
+                          className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium"
+                        >
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Skills I Want to Learn */}
+                {profile.skillsToLearn && profile.skillsToLearn.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                      <BookOpen className="w-4 h-4 mr-2 text-purple-600" />
+                      Skills I Want to Learn
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {profile.skillsToLearn.map((skill, index) => (
+                        <span
+                          key={index}
+                          className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium"
                         >
                           {skill}
                         </span>
@@ -216,9 +236,9 @@ const ProfileViewModal = ({ profile, isOpen, onClose }) => {
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-xs text-gray-500 uppercase tracking-wide">Website</p>
-                          <a 
-                            href={profile.website} 
-                            target="_blank" 
+                          <a
+                            href={profile.website}
+                            target="_blank"
                             rel="noopener noreferrer"
                             className="text-sm font-medium text-purple-600 hover:text-purple-800 break-all"
                           >

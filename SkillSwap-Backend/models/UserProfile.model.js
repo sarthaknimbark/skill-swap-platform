@@ -66,6 +66,16 @@ const userProfileSchema = new mongoose.Schema(
         experience: [experienceSchema],
         education: [educationSchema],
 
+        // Skills
+        skillsOffered: {
+            type: [String],
+            default: [],
+        },
+        skillsToLearn: {
+            type: [String],
+            default: [],
+        },
+
         // Availability and credits
         availability: {
             type: [String],
@@ -84,8 +94,8 @@ const userProfileSchema = new mongoose.Schema(
         },
     },
     {
-        timestamps:true,
+        timestamps: true,
     }
 );
 
-module.exports = mongoose.model("UserProfile",userProfileSchema);
+module.exports = mongoose.model("UserProfile", userProfileSchema);

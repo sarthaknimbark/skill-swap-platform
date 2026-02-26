@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, User, Briefcase, GraduationCap, Calendar, Check, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, User, Briefcase, GraduationCap, Calendar, Check, Clock, Zap } from 'lucide-react';
 import UserProfileService from '../services/userProfile.service';
 import { useNavigate } from 'react-router';
 import { useAuth } from "../context/AuthContext";
@@ -19,20 +19,25 @@ const UserProfile = () => {
         experience: [],
         education: [],
         availability: [],
-        timeCredits: 0, // Added timeCredits field
+        timeCredits: 0,
         isProfilePublic: true,
+        skillsOffered: [],
+        skillsToLearn: [],
     });
+    const [skillOfferedInput, setSkillOfferedInput] = useState("");
+    const [skillToLearnInput, setSkillToLearnInput] = useState("");
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
 
-    const totalSteps = 5; // Updated to 5 steps
+    const totalSteps = 6;
 
     const steps = [
         { number: 1, title: "Personal Info", icon: User },
-        { number: 2, title: "Experience", icon: Briefcase },
-        { number: 3, title: "Education", icon: GraduationCap },
-        { number: 4, title: "Availability", icon: Calendar },
-        { number: 5, title: "Time Credits", icon: Clock }, // Added Time Credits step
+        { number: 2, title: "Skills", icon: Zap },
+        { number: 3, title: "Experience", icon: Briefcase },
+        { number: 4, title: "Education", icon: GraduationCap },
+        { number: 5, title: "Availability", icon: Calendar },
+        { number: 6, title: "Time Credits", icon: Clock },
     ];
 
     // Experience handlers
@@ -88,46 +93,65 @@ const UserProfile = () => {
 
     // ==================== SKILLS HANDLERS ====================
 
-// Add Skill Offered
-const addSkillOffered = (skill) => {
-    if (skill.trim() !== "" && !form.skillsOffered.includes(skill)) {
+    // Add Skill Offered
+    const addSkillOffered = (skill) => {
+        if (skill.trim() !== "" && !form.skillsOffered.includes(skill)) {
+            setForm({
+                ...form,
+                skillsOffered: [...form.skillsOffered, skill.trim()]
+            });
+        }
+    };
+
+    // Remove Skill Offered
+    const removeSkillOffered = (skill) => {
         setForm({
             ...form,
-            skillsOffered: [...form.skillsOffered, skill.trim()]
+            skillsOffered: form.skillsOffered.filter(s => s !== skill)
         });
-    }
-};
+    };
 
-// Remove Skill Offered
-const removeSkillOffered = (skill) => {
-    setForm({
-        ...form,
-        skillsOffered: form.skillsOffered.filter(s => s !== skill)
-    });
-};
+    // Add Skill To Learn
+    const addSkillToLearn = (skill) => {
+        if (skill.trim() !== "" && !form.skillsToLearn.includes(skill)) {
+            setForm({
+                ...form,
+                skillsToLearn: [...form.skillsToLearn, skill.trim()]
+            });
+        }
+    };
 
-// Add Skill To Learn
-const addSkillToLearn = (skill) => {
-    if (skill.trim() !== "" && !form.skillsToLearn.includes(skill)) {
+    // Remove Skill To Learn
+    const removeSkillToLearn = (skill) => {
         setForm({
             ...form,
-            skillsToLearn: [...form.skillsToLearn, skill.trim()]
+            skillsToLearn: form.skillsToLearn.filter(s => s !== skill)
         });
-    }
-};
+    };
 
-// Remove Skill To Learn
-const removeSkillToLearn = (skill) => {
-    setForm({
-        ...form,
-        skillsToLearn: form.skillsToLearn.filter(s => s !== skill)
-    });
-};
-
-    // Main form handlers
     const handleChange = (e) => {
         const value = e.target.type === 'number' ? parseInt(e.target.value) || 0 : e.target.value;
         setForm({ ...form, [e.target.name]: value });
+    };
+
+    // ── skill chip helpers ────────────────────────────────────────────────────
+    const addSkill = (field, value, setter) => {
+        const trimmed = value.trim();
+        if (trimmed && !form[field].includes(trimmed)) {
+            setForm(prev => ({ ...prev, [field]: [...prev[field], trimmed] }));
+        }
+        setter("");
+    };
+
+    const removeSkill = (field, skill) => {
+        setForm(prev => ({ ...prev, [field]: prev[field].filter(s => s !== skill) }));
+    };
+
+    const handleSkillKeyDown = (e, field, value, setter) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            addSkill(field, value, setter);
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -135,7 +159,6 @@ const removeSkillToLearn = (skill) => {
         setError("");
         setSuccess("");
         try {
-            // Prepare data according to controller expectations
             const profileData = {
                 userId: user._id || user.id,
                 fullname: form.fullname,
@@ -149,7 +172,9 @@ const removeSkillToLearn = (skill) => {
                 education: form.education,
                 availability: form.availability,
                 timeCredits: form.timeCredits,
-                isProfilePublic: form.isProfilePublic
+                isProfilePublic: form.isProfilePublic,
+                skillsOffered: form.skillsOffered,
+                skillsToLearn: form.skillsToLearn,
             };
 
             await UserProfileService.createProfile(profileData);
@@ -183,16 +208,6 @@ const removeSkillToLearn = (skill) => {
         switch (step) {
             case 1:
                 return form.fullname.trim() !== "";
-            case 2:
-                return true; // Experience is optional
-            case 3:
-                return true; // Education is optional
-            case 4:
-                return true; // Availability is optional
-            case 5:
-                return true;
-            case 6:
-                return true; // Time Credits is optional
             default:
                 return true;
         }
@@ -338,6 +353,84 @@ const removeSkillToLearn = (skill) => {
 
             case 2:
                 return (
+                    <div className="space-y-8">
+                        <h2 className="text-2xl font-bold text-gray-800 mb-6">Skills</h2>
+                        <p className="text-gray-500 text-sm -mt-4">Add the skills you can teach and the skills you want to learn. Press Enter or click Add after each skill.</p>
+
+                        {/* Skills I Offer */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-3">
+                                🟢 Skills I Offer <span className="font-normal text-gray-400">(what I can teach)</span>
+                            </label>
+                            <div className="flex gap-2 mb-3">
+                                <input
+                                    type="text"
+                                    placeholder="e.g. Python, Photoshop, Guitar..."
+                                    value={skillOfferedInput}
+                                    onChange={e => setSkillOfferedInput(e.target.value)}
+                                    onKeyDown={e => handleSkillKeyDown(e, 'skillsOffered', skillOfferedInput, setSkillOfferedInput)}
+                                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => addSkill('skillsOffered', skillOfferedInput, setSkillOfferedInput)}
+                                    className="px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition"
+                                >
+                                    Add
+                                </button>
+                            </div>
+                            <div className="flex flex-wrap gap-2 min-h-[2.5rem]">
+                                {form.skillsOffered.map((skill, idx) => (
+                                    <span key={idx} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                                        {skill}
+                                        <button type="button" onClick={() => removeSkill('skillsOffered', skill)} className="hover:text-green-600 text-green-500 font-bold leading-none">&times;</button>
+                                    </span>
+                                ))}
+                                {form.skillsOffered.length === 0 && (
+                                    <p className="text-gray-400 text-sm italic">No skills added yet</p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Skills I Want to Learn */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-3">
+                                🟣 Skills I Want to Learn <span className="font-normal text-gray-400">(what I want to pick up)</span>
+                            </label>
+                            <div className="flex gap-2 mb-3">
+                                <input
+                                    type="text"
+                                    placeholder="e.g. Machine Learning, Cooking, Spanish..."
+                                    value={skillToLearnInput}
+                                    onChange={e => setSkillToLearnInput(e.target.value)}
+                                    onKeyDown={e => handleSkillKeyDown(e, 'skillsToLearn', skillToLearnInput, setSkillToLearnInput)}
+                                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => addSkill('skillsToLearn', skillToLearnInput, setSkillToLearnInput)}
+                                    className="px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium transition"
+                                >
+                                    Add
+                                </button>
+                            </div>
+                            <div className="flex flex-wrap gap-2 min-h-[2.5rem]">
+                                {form.skillsToLearn.map((skill, idx) => (
+                                    <span key={idx} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">
+                                        {skill}
+                                        <button type="button" onClick={() => removeSkill('skillsToLearn', skill)} className="hover:text-purple-600 text-purple-500 font-bold leading-none">&times;</button>
+                                    </span>
+                                ))}
+                                {form.skillsToLearn.length === 0 && (
+                                    <p className="text-gray-400 text-sm italic">No skills added yet</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+
+            case 3:
+                return (
                     <div className="space-y-6">
                         <div className="flex justify-between items-center">
                             <h2 className="text-2xl font-bold text-gray-800">Work Experience</h2>
@@ -437,7 +530,7 @@ const removeSkillToLearn = (skill) => {
                     </div>
                 );
 
-            case 3:
+            case 4:
                 return (
                     <div className="space-y-6">
                         <div className="flex justify-between items-center">
@@ -528,7 +621,7 @@ const removeSkillToLearn = (skill) => {
                     </div>
                 );
 
-            case 4:
+            case 5:
                 return (
                     <div className="space-y-6">
                         <h2 className="text-2xl font-bold text-gray-800">Availability</h2>
@@ -570,7 +663,7 @@ const removeSkillToLearn = (skill) => {
                     </div>
                 );
 
-            case 5:
+            case 6:
                 return (
                     <div className="space-y-6">
                         <h2 className="text-2xl font-bold text-gray-800">Time Credits</h2>
@@ -607,7 +700,7 @@ const removeSkillToLearn = (skill) => {
                         </div>
                     </div>
                 );
-                
+
 
             default:
                 return null;
@@ -662,7 +755,7 @@ const removeSkillToLearn = (skill) => {
                         })}
                     </div>
                 </div>
-                
+
 
                 {/* Main Content */}
                 <div className="bg-white rounded-lg shadow-sm p-8">

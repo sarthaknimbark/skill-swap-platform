@@ -12,15 +12,25 @@ const ProfileCard = React.memo(({ profile, onViewProfile, onSendRequest }) => {
             : profile.aboutMe;
     }, [profile.aboutMe]);
 
-    const displaySkills = useMemo(() => {
-        if (!profile.skills || profile.skills.length === 0) return [];
-        return profile.skills.slice(0, MAX_SKILLS_DISPLAY);
-    }, [profile.skills]);
+    const displaySkillsOffered = useMemo(() => {
+        if (!profile.skillsOffered || profile.skillsOffered.length === 0) return [];
+        return profile.skillsOffered.slice(0, MAX_SKILLS_DISPLAY);
+    }, [profile.skillsOffered]);
 
-    const remainingSkillsCount = useMemo(() => {
-        if (!profile.skills) return 0;
-        return Math.max(0, profile.skills.length - MAX_SKILLS_DISPLAY);
-    }, [profile.skills]);
+    const remainingOfferedCount = useMemo(() => {
+        if (!profile.skillsOffered) return 0;
+        return Math.max(0, profile.skillsOffered.length - MAX_SKILLS_DISPLAY);
+    }, [profile.skillsOffered]);
+
+    const displaySkillsToLearn = useMemo(() => {
+        if (!profile.skillsToLearn || profile.skillsToLearn.length === 0) return [];
+        return profile.skillsToLearn.slice(0, 2);
+    }, [profile.skillsToLearn]);
+
+    const remainingLearnCount = useMemo(() => {
+        if (!profile.skillsToLearn) return 0;
+        return Math.max(0, profile.skillsToLearn.length - 2);
+    }, [profile.skillsToLearn]);
 
     const handleViewProfile = () => {
         if (onViewProfile) {
@@ -38,7 +48,7 @@ const ProfileCard = React.memo(({ profile, onViewProfile, onSendRequest }) => {
         <div className="group bg-white rounded-3xl p-6 shadow-sm hover:shadow-xl transition-all duration-500 border border-gray-100 hover:border-blue-200 overflow-hidden relative">
             {/* Subtle background decoration */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-50 to-transparent rounded-full -mr-16 -mt-16 opacity-60 group-hover:opacity-80 transition-opacity duration-500"></div>
-            
+
             {/* Profile Section */}
             <div className="relative z-10 text-center mb-6">
                 {/* Avatar */}
@@ -77,11 +87,12 @@ const ProfileCard = React.memo(({ profile, onViewProfile, onSendRequest }) => {
                 </p>
             </div>
 
-            {/* Skills Section */}
-            {displaySkills.length > 0 && (
-                <div className="relative z-10 mb-6">
+            {/* Skills Offered */}
+            {displaySkillsOffered.length > 0 && (
+                <div className="relative z-10 mb-3">
+                    <p className="text-xs text-gray-400 text-center mb-1.5 font-medium uppercase tracking-wide">Offers</p>
                     <div className="flex flex-wrap justify-center gap-1.5">
-                        {displaySkills.map((skill, index) => (
+                        {displaySkillsOffered.map((skill, index) => (
                             <span
                                 key={index}
                                 className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full border border-blue-100"
@@ -89,9 +100,31 @@ const ProfileCard = React.memo(({ profile, onViewProfile, onSendRequest }) => {
                                 {skill}
                             </span>
                         ))}
-                        {remainingSkillsCount > 0 && (
+                        {remainingOfferedCount > 0 && (
                             <span className="px-2.5 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full border border-gray-200">
-                                +{remainingSkillsCount} more
+                                +{remainingOfferedCount} more
+                            </span>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Skills To Learn */}
+            {displaySkillsToLearn.length > 0 && (
+                <div className="relative z-10 mb-5">
+                    <p className="text-xs text-gray-400 text-center mb-1.5 font-medium uppercase tracking-wide">Wants to learn</p>
+                    <div className="flex flex-wrap justify-center gap-1.5">
+                        {displaySkillsToLearn.map((skill, index) => (
+                            <span
+                                key={index}
+                                className="px-2.5 py-1 bg-purple-50 text-purple-700 text-xs font-medium rounded-full border border-purple-100"
+                            >
+                                {skill}
+                            </span>
+                        ))}
+                        {remainingLearnCount > 0 && (
+                            <span className="px-2.5 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full border border-gray-200">
+                                +{remainingLearnCount} more
                             </span>
                         )}
                     </div>
@@ -119,7 +152,7 @@ const ProfileCard = React.memo(({ profile, onViewProfile, onSendRequest }) => {
                     View Profile
                     <ArrowRight className="w-3 h-3 opacity-0 group-hover/btn:opacity-100 group-hover/btn:translate-x-0.5 transition-all duration-300" />
                 </button>
-                
+
                 <button
                     onClick={handleSendRequest}
                     className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl transition-all duration-300 font-medium text-sm shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
