@@ -92,6 +92,12 @@ const userProfileSchema = new mongoose.Schema(
             type: Boolean,
             default: true,
         },
+        // How many times the profile has been viewed by others
+        profileViews: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
     },
     {
         timestamps: true,

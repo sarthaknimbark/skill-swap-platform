@@ -142,6 +142,16 @@ const UserProfileService = {
             throw error.response?.data || error.message;
         }
     },
+
+    // Analytics
+    getAnalytics: async () => {
+        try {
+            const response = await API.get("/analytics");
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || error.message;
+        }
+    },
 };
 
 export default UserProfileService;

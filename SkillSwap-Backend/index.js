@@ -24,6 +24,7 @@ const usetProfileRoutes = require("./routes/userProfile.route");
 const swapRequestRoutes = require("./routes/swapRequest.route");
 const chatRoutes = require("./routes/chat.route");
 const callRoutes = require("./routes/call.route");
+const analyticsRoutes = require("./routes/analytics.route");
 
 // middleware
 app.use(express.json());
@@ -203,6 +204,7 @@ app.use("/api/profile", usetProfileRoutes);
 app.use("/api/swap-requests", swapRequestRoutes);
 app.use("/api/chats", chatRoutes);
 app.use("/api/calls", callRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
 const PORT = process.env.PORT || 3000;
 

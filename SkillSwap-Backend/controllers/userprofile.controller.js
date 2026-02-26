@@ -92,6 +92,11 @@ exports.getProfileByUserId = async (req, res) => {
             });
         }
 
+        // increment view count if the requester is not the owner
+        if (req.user && req.user.id !== profile.userId._id.toString()) {
+            await UserProfile.findByIdAndUpdate(profile._id, { $inc: { profileViews: 1 } });
+        }
+
         res.status(200).json({
             success: true,
             data: profile
@@ -125,6 +130,11 @@ exports.getProfileById = async (req, res) => {
                 success: false,
                 message: "Profile not found"
             });
+        }
+
+        // increment view count when someone besides the owner accesses this profile
+        if (req.user && req.user.id !== profile.userId._id.toString()) {
+            await UserProfile.findByIdAndUpdate(profile._id, { $inc: { profileViews: 1 } });
         }
 
         res.status(200).json({

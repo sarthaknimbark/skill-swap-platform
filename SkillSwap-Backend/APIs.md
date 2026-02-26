@@ -12,3 +12,6 @@ http://localhost:3000/api/auth/login
 }
 
 http://localhost:3000/api/auth/logout
+
+http://localhost:3000/api/analytics  (GET, auth required)  
+    // returns the current user's connection count, unread messages, profile view count and recent activity feed
