@@ -1,8 +1,20 @@
+import { useNavigate } from "react-router-dom";
 import { Bell } from "lucide-react";
 
 // Notifications Component
-const NotificationCenter = ({ notifications }) => {
-    if (!notifications || notifications.length === 0) return null;
+const NotificationCenter = ({ notifications, userId }) => {
+    const navigate = useNavigate();
+
+    if (!notifications || notifications.length === 0) {
+        return (
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-8">
+                <div className="flex items-center space-x-3 p-4 text-center text-gray-500">
+                    <Bell className="h-5 w-5" />
+                    <p>No notifications yet</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-8">
@@ -29,8 +41,11 @@ const NotificationCenter = ({ notifications }) => {
             </div>
 
             {notifications.length > 3 && (
-                <button className="w-full mt-3 text-blue-600 hover:text-blue-800 text-sm font-medium">
-                    View {notifications.length - 3} more notifications
+                <button
+                    onClick={() => navigate("/notifications")}
+                    className="w-full mt-3 text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors duration-200"
+                >
+                    View all notifications →
                 </button>
             )}
         </div>

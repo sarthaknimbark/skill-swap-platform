@@ -252,7 +252,7 @@ const NeedHelp = () => {
         break;
       case 'Phone Support':
         // Show phone number or initiate call
-        window.open('tel:+91 9574257087');
+        window.open('tel:+91 7016612100');
         break;
       default:
         break;

@@ -160,6 +160,42 @@ const Profile = () => {
                     </div>
                 </div>
 
+                {/* Skills Offered Section */}
+                <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+                    <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center sm:text-left">
+                        Skills Offered
+                    </h2>
+                    {user.skillsOffered && user.skillsOffered.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                            {user.skillsOffered.map((skill, idx) => (
+                                <span key={idx} className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
+                                    {skill}
+                                </span>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-gray-500 italic text-center sm:text-left text-sm sm:text-base">
+                            No skills offered yet.
+                        </p>
+                    )}
+                </div>
+
+                {/* Skills To Learn Section */}
+                {user.skillsToLearn && user.skillsToLearn.length > 0 && (
+                    <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+                        <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center sm:text-left">
+                            Skills to Learn
+                        </h2>
+                        <div className="flex flex-wrap gap-2">
+                            {user.skillsToLearn.map((skill, idx) => (
+                                <span key={idx} className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm">
+                                    {skill}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* Experience Section */}
                 <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
                     <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center justify-center sm:justify-start">

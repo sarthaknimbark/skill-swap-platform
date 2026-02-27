@@ -46,8 +46,8 @@ const HeaderNavigation = ({ user }) => {
           {/* Logo and primary navigation */}
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
-              <Link to="/" className="text-xl font-semibold tracking-tight text-gray-900 hover:text-gray-700">
-                Skill Swap
+              <Link to="/" className="flex items-center hover:opacity-80 transition-opacity">
+                <img src="/src/assets/ss.png" alt="Skill Swap" className="h-20 w-auto" />
               </Link>
             </div>
             

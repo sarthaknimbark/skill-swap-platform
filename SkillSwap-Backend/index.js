@@ -25,6 +25,7 @@ const swapRequestRoutes = require("./routes/swapRequest.route");
 const chatRoutes = require("./routes/chat.route");
 const callRoutes = require("./routes/call.route");
 const analyticsRoutes = require("./routes/analytics.route");
+const notificationRoutes = require("./routes/notification.route");
 
 // middleware
 app.use(express.json());
@@ -205,6 +206,7 @@ app.use("/api/swap-requests", swapRequestRoutes);
 app.use("/api/chats", chatRoutes);
 app.use("/api/calls", callRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 const PORT = process.env.PORT || 3000;
 
