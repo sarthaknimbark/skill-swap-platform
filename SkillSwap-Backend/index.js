@@ -7,9 +7,14 @@ const jwt = require('jsonwebtoken');
 const UserModel = require('./models/User.model');
 const app = express();
 const server = createServer(app);
+
+// Configure allowed origins for CORS / Socket.IO
+const FRONTEND_ORIGIN =
+  process.env.FRONTEND_URL || "http://localhost:5173";
+
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: FRONTEND_ORIGIN,
     methods: ["GET", "POST"],
     credentials: true
   }
@@ -32,10 +37,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 connectToDB();
-app.use(cors({
-  origin: "http://localhost:5173", // React app's URL (Vite default port)
-  credentials: true, // Allow cookies to be sent
-}));
+app.use(
+  cors({
+    origin: FRONTEND_ORIGIN, // Frontend URL (configurable via FRONTEND_URL)
+    credentials: true, // Allow cookies to be sent
+  })
+);
 app.use(morgan("dev"));
 
 // Socket.IO authentication middleware
