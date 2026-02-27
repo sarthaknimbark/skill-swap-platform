@@ -11,13 +11,15 @@ const server = createServer(app);
 // Configure allowed origins for CORS / Socket.IO
 const FRONTEND_ORIGIN =
   process.env.FRONTEND_URL || "http://localhost:5173";
+const ALLOW_ALL_ORIGINS = process.env.CORS_ORIGIN === "*";
 
 const io = new Server(server, {
   cors: {
-    origin: FRONTEND_ORIGIN,
+    // If CORS_ORIGIN="*", allow any origin (useful for deployed frontend)
+    origin: ALLOW_ALL_ORIGINS ? true : FRONTEND_ORIGIN,
     methods: ["GET", "POST"],
-    credentials: true
-  }
+    credentials: true,
+  },
 });
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
@@ -39,7 +41,8 @@ app.use(cookieParser());
 connectToDB();
 app.use(
   cors({
-    origin: FRONTEND_ORIGIN, // Frontend URL (configurable via FRONTEND_URL)
+    // If CORS_ORIGIN="*", allow any origin; otherwise restrict to FRONTEND_ORIGIN
+    origin: ALLOW_ALL_ORIGINS ? true : FRONTEND_ORIGIN,
     credentials: true, // Allow cookies to be sent
   })
 );
