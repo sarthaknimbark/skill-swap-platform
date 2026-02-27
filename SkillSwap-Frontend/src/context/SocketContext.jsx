@@ -12,6 +12,9 @@ export const useSocket = () => {
   return context;
 };
 
+const SOCKET_URL =
+  import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
+
 export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -32,7 +35,7 @@ export const SocketProvider = ({ children }) => {
     if (user && token) {
       console.log('SocketContext - Creating socket connection with token');
       // Create socket connection with authentication
-      const newSocket = io('http://localhost:3000', {
+      const newSocket = io(SOCKET_URL, {
         auth: {
           token: token
         },
