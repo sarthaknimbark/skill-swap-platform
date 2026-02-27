@@ -1,25 +1,22 @@
 import axios from "axios";
 
+// Decide API base URL from env, with localhost as dev fallback only
 const getBaseURL = () => {
-  // Highest priority: explicit env override
+  // 1) Prefer explicit API base URL
   if (import.meta.env.VITE_API_BASE_URL) {
     return import.meta.env.VITE_API_BASE_URL;
   }
 
-  // If running in a browser, decide based on hostname
-  if (typeof window !== "undefined") {
-    const { protocol, hostname, host } = window.location;
-
-    // Local development: keep talking to backend on :3000
-    if (hostname === "localhost" || hostname === "127.0.0.1") {
-      return "http://localhost:3000/api";
+  // 2) Fallback to legacy VITE_BACKEND_URL if present
+  if (import.meta.env.VITE_BACKEND_URL) {
+    // Ensure it ends with /api for consistency
+    if (import.meta.env.VITE_BACKEND_URL.endsWith("/api")) {
+      return import.meta.env.VITE_BACKEND_URL;
     }
-
-    // Production: assume backend is mounted under /api on same origin
-    return `${protocol}//${host}/api`;
+    return `${import.meta.env.VITE_BACKEND_URL.replace(/\/$/, "")}/api`;
   }
 
-  // Fallback (SSR / unknown env)
+  // 3) Local dev default
   return "http://localhost:3000/api";
 };
 
