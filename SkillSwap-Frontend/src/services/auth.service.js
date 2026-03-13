@@ -5,7 +5,8 @@ export const fetchUserInfo = async () => {
         const res = await API.get("/auth/me"); 
         return res.data;
     } catch (err) {
-        console.log(err); 
+        console.error("fetchUserInfo error:", err.response?.data || err.message);
+        throw err;
     }
 } 
 export const register = async (formData) => {
