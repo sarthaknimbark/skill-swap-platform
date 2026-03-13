@@ -84,7 +84,7 @@ async def health():
 
 
 @app.post("/match-skills", response_model=MatchResponse)
-async def match_skills(payload: MatchQuery) -> MatchResponse:
+async def match_skills(payload: dict) -> MatchResponse:
     """
     Rank candidate profiles for a seeker using semantic similarity.
 
@@ -92,14 +92,55 @@ async def match_skills(payload: MatchQuery) -> MatchResponse:
     - We want people whose **skills_offered** match what the seeker wants to learn.
     - We also lightly reward overlap between offered skills (mutual expertise).
     """
-    if not payload.candidates:
+    # Accept flexible payloads from Node/Frontend and coerce to our models.
+    seeker_raw = payload.get("seeker") or {}
+    candidates_raw = payload.get("candidates") or []
+    top_k_raw = payload.get("top_k", 10)
+
+    try:
+      top_k = int(top_k_raw)
+    except Exception:
+      top_k = 10
+
+    if not candidates_raw:
+        return MatchResponse(matches=[])
+
+    # Convert raw dicts into ProfileIn instances
+    seeker = ProfileIn(
+        user_id=str(seeker_raw.get("user_id", "")),
+        fullname=seeker_raw.get("fullname"),
+        headline=seeker_raw.get("headline"),
+        about_me=seeker_raw.get("about_me"),
+        skills_offered=seeker_raw.get("skills_offered") or [],
+        skills_to_learn=seeker_raw.get("skills_to_learn") or [],
+        location=seeker_raw.get("location"),
+    )
+
+    candidates: list[ProfileIn] = []
+    for c in candidates_raw:
+        try:
+            candidates.append(
+                ProfileIn(
+                    user_id=str(c.get("user_id", "")),
+                    fullname=c.get("fullname"),
+                    headline=c.get("headline"),
+                    about_me=c.get("about_me"),
+                    skills_offered=c.get("skills_offered") or [],
+                    skills_to_learn=c.get("skills_to_learn") or [],
+                    location=c.get("location"),
+                )
+            )
+        except Exception:
+            continue
+
+    if not candidates:
         return MatchResponse(matches=[])
 
     model = get_model()
 
     # Text standing for "what the seeker is looking for"
-    seeker_need_text = build_profile_text(payload.seeker, focus="to_learn")
-    seeker_offer_text = build_profile_text(payload.seeker, focus="offered")
+    seeker_need_text = build_profile_text(seeker, focus="to_learn")
+    seeker_offer_text = build_profile_text(seeker, focus="offered")
 
     # Fallbacks if seeker fields are empty
     if not seeker_need_text.strip():
@@ -113,7 +154,7 @@ async def match_skills(payload: MatchQuery) -> MatchResponse:
     cand_need_texts: list[str] = []
     cand_offer_texts: list[str] = []
 
-    for c in payload.candidates:
+    for c in candidates:
         cand_need_texts.append(build_profile_text(c, focus="to_learn"))
         cand_offer_texts.append(build_profile_text(c, focus="offered"))
 
@@ -134,12 +175,12 @@ async def match_skills(payload: MatchQuery) -> MatchResponse:
     combined_np = combined.cpu().numpy().astype(float)
 
     # Sort by score desc, keep top_k
-    top_k = min(payload.top_k, len(payload.candidates))
+    top_k = min(top_k, len(candidates))
     top_indices = np.argsort(-combined_np)[:top_k]
 
     matches: list[MatchResult] = []
     for idx in top_indices:
-        c = payload.candidates[int(idx)]
+        c = candidates[int(idx)]
         score = float(combined_np[int(idx)])
         reason = (
             "Strong match between their offered skills and what you want to learn; "

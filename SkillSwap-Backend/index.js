@@ -33,6 +33,7 @@ const chatRoutes = require("./routes/chat.route");
 const callRoutes = require("./routes/call.route");
 const analyticsRoutes = require("./routes/analytics.route");
 const notificationRoutes = require("./routes/notification.route");
+const aiRoutes = require("./routes/ai.route");
 
 // middleware
 app.use(express.json());
@@ -217,6 +218,7 @@ app.use("/api/chats", chatRoutes);
 app.use("/api/calls", callRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/ai", aiRoutes);
 
 const PORT = process.env.PORT || 3000;
 
