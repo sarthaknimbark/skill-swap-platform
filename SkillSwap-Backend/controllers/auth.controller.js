@@ -56,14 +56,17 @@ exports.login = async (req, res) => {
       expiresIn: "1d"
     });
 
-    // Send token as cookie
+    // Cookie options: cross-origin (Vercel→Render) requires sameSite: "none" + secure
+    const isProduction = process.env.NODE_ENV === "production";
+    const cookieOptions = {
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000,
+      sameSite: isProduction ? "none" : "strict",
+      secure: isProduction,
+    };
+
     res
-      .cookie("token", token, {
-        httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000,
-        sameSite: "strict",
-        secure: process.env.NODE_ENV === "production"
-      })
+      .cookie("token", token, cookieOptions)
       .json({ message: "Login successful", token });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -72,14 +75,22 @@ exports.login = async (req, res) => {
 // logout user
 exports.logout = (req, res) => {
   try {
-    res.clearCookie("token").json({ message: "Logged out successfully" });
+    const isProduction = process.env.NODE_ENV === "production";
+    res
+      .clearCookie("token", {
+        sameSite: isProduction ? "none" : "strict",
+        secure: isProduction,
+      })
+      .json({ message: "Logged out successfully" });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
 exports.checkAuth = async (req, res) => {
-  const token = req.cookies.token;
+  const token =
+    req.cookies.token ||
+    (req.headers.authorization && req.headers.authorization.split(" ")[1]);
   if (!token) return res.status(401).json({ message: "No token, auth denied" });
 
   try {

@@ -26,4 +26,13 @@ const API = axios.create({
   withCredentials: true,
 });
 
+// Send Bearer token from localStorage so auth works cross-origin (cookie may not be sent)
+API.interceptors.request.use((config) => {
+  const token = typeof window !== "undefined" && window.localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export default API;
