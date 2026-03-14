@@ -13,11 +13,27 @@ const FRONTEND_ORIGIN =
   process.env.FRONTEND_URL || "http://localhost:5173";
 const ALLOW_ALL_ORIGINS = process.env.CORS_ORIGIN === "*";
 
+// Allow both production frontend and local dev
+const CORS_ORIGINS = [
+  FRONTEND_ORIGIN,
+  "http://localhost:5173",
+  "https://skill-swap-platform-frontend.vercel.app",
+].filter(Boolean);
+
+const corsOptions = {
+  origin: ALLOW_ALL_ORIGINS ? true : (origin, cb) => {
+    if (!origin) return cb(null, true);
+    if (CORS_ORIGINS.some((allowed) => allowed === origin)) return cb(null, true);
+    if (ALLOW_ALL_ORIGINS) return cb(null, true);
+    cb(null, false);
+  },
+  credentials: true,
+};
+
 const io = new Server(server, {
   cors: {
-    // If CORS_ORIGIN="*", allow any origin (useful for deployed frontend)
-    origin: ALLOW_ALL_ORIGINS ? true : FRONTEND_ORIGIN,
-    methods: ["GET", "POST"],
+    origin: ALLOW_ALL_ORIGINS ? true : CORS_ORIGINS,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true,
   },
 });
@@ -40,13 +56,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 connectToDB();
-app.use(
-  cors({
-    // If CORS_ORIGIN="*", allow any origin; otherwise restrict to FRONTEND_ORIGIN
-    origin: ALLOW_ALL_ORIGINS ? true : FRONTEND_ORIGIN,
-    credentials: true, // Allow cookies to be sent
-  })
-);
+app.use(cors({ ...corsOptions }));
 app.use(morgan("dev"));
 
 // Socket.IO authentication middleware
