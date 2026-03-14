@@ -441,7 +441,17 @@ const PublicProfiles = () => {
       setAiMessage("");
     } catch (err) {
       console.error("AI Skill Match error:", err);
-      setAiMessage("Unable to run AI skill matching right now. Please try again later.");
+      const msg = err.response?.data?.message || err.response?.data?.details;
+      const isUnavailable =
+        err.response?.status === 503 ||
+        msg?.includes("starting up") ||
+        msg?.includes("unavailable") ||
+        err.code === "ECONNABORTED";
+      setAiMessage(
+        isUnavailable
+          ? "AI service is starting up. Please wait 30–60 seconds and try again."
+          : msg || "Unable to run AI skill matching right now. Please try again later."
+      );
     } finally {
       setAiLoading(false);
     }
