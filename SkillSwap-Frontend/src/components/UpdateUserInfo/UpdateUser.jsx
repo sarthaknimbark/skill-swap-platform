@@ -1,3 +1,4 @@
+
 // pages/UpdateProfile.jsx
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, User, Briefcase, GraduationCap, Calendar, Check, Save, Clock, Zap } from 'lucide-react';

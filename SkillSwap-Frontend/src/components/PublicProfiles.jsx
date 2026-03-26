@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Search, User, MapPin, Mail, ChevronLeft, ChevronRight, AlertCircle, Loader2 } from 'lucide-react';
 import UserProfileService from "../services/userProfile.service";
 import SwapRequestsService from '../services/swapRequests.service';
+import { matchSkills } from "../services/ai.service";
 
 // Component imports
 import ProfileCard from './PublicProfile/ProfileCard';
@@ -144,6 +145,12 @@ const PublicProfiles = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [currentUserProfile, setCurrentUserProfile] = useState(null);
+
+  // AI matching state
+  const [aiActive, setAiActive] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiMessage, setAiMessage] = useState("");
 
   // New state for swap modal
   const [showSwapModal, setShowSwapModal] = useState(false);
@@ -160,11 +167,15 @@ const PublicProfiles = () => {
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
-        // Assuming you have a method to get current user info
-        // Replace this with your actual method to get current user
-        const currentUser = await fetchUserInfo(); // or however you get current user 
+        const currentUser = await fetchUserInfo();
+        if (!currentUser) return;
 
-        setCurrentUserId(currentUser._id || currentUser.id);
+        const id = currentUser._id || currentUser.id;
+        setCurrentUserId(id);
+
+        // Fetch full profile for AI matching context
+        const profile = await UserProfileService.getProfileByUserId(id);
+        setCurrentUserProfile(profile);
       } catch (error) {
         console.error('Error fetching current user:', error);
       }
@@ -364,6 +375,88 @@ const PublicProfiles = () => {
     setSelectedProfile(null);
   }, []);
 
+  // AI Skill Match handler
+  const handleAiMatch = useCallback(async () => {
+    try {
+      setAiMessage("");
+      setAiActive(true);
+
+      if (!currentUserProfile) {
+        setAiMessage("No profile detected for your preferred skills. Please complete your profile first.");
+        return;
+      }
+
+      if (!profiles.length) {
+        setAiMessage("No profile detected for your preferred skills.");
+        return;
+      }
+
+      setAiLoading(true);
+
+      const toAiProfile = (p) => ({
+        user_id: p.userId?._id || p.userId || p._id,
+        fullname: p.fullname || "",
+        headline: p.headline || "",
+        about_me: p.aboutMe || "",
+        skills_offered: p.skillsOffered || [],
+        skills_to_learn: p.skillsToLearn || [],
+        location: p.location || "",
+      });
+
+      const seeker = toAiProfile(currentUserProfile);
+      const candidates = profiles.map(toAiProfile);
+
+      const result = await matchSkills({
+        seeker,
+        candidates,
+        top_k: 1, // only keep the single best-matched profile
+      });
+
+      if (!result.matches || !result.matches.length) {
+        setAiMessage("No profile detected for your preferred skills.");
+        return;
+      }
+
+      // Build a lookup for profiles by user id
+      const byUserId = new Map();
+      profiles.forEach((p) => {
+        const uid = p.userId?._id || p.userId || p._id;
+        if (uid) byUserId.set(String(uid), p);
+      });
+
+      const rankedProfiles = result.matches
+        .map((m) => {
+          const base = byUserId.get(String(m.user_id));
+          if (!base) return null;
+          return { ...base, aiScore: m.score };
+        })
+        .filter(Boolean);
+
+      if (!rankedProfiles.length) {
+        setAiMessage("No profile detected for your preferred skills.");
+        return;
+      }
+
+      setProfiles(rankedProfiles);
+      setAiMessage("");
+    } catch (err) {
+      console.error("AI Skill Match error:", err);
+      const msg = err.response?.data?.message || err.response?.data?.details;
+      const isUnavailable =
+        err.response?.status === 503 ||
+        msg?.includes("starting up") ||
+        msg?.includes("unavailable") ||
+        err.code === "ECONNABORTED";
+      setAiMessage(
+        isUnavailable
+          ? "AI service is starting up. Please wait 30–60 seconds and try again."
+          : msg || "Unable to run AI skill matching right now. Please try again later."
+      );
+    } finally {
+      setAiLoading(false);
+    }
+  }, [currentUserProfile, profiles]);
+
   // Computed values
   const isFirstLoad = isLoading && profiles.length === 0 && !error;
   const showSkeletons = isFirstLoad;
@@ -373,24 +466,48 @@ const PublicProfiles = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Search */}
-        <div className="relative mb-8">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="h-5 w-5 text-gray-400" />
-          </div>
-          <input
-            type="text"
-            placeholder="Search by name, headline, or location..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-          />
-          {isSearching && (
-            <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-              <Loader2 className="h-4 w-4 text-gray-400 animate-spin" />
+        {/* Search + AI Match */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+          <div className="relative flex-1">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-5 w-5 text-gray-400" />
             </div>
-          )}
+            <input
+              type="text"
+              placeholder="Search by name, headline, or location..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            />
+            {isSearching && (
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                <Loader2 className="h-4 w-4 text-gray-400 animate-spin" />
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleAiMatch}
+            disabled={aiLoading || isLoading}
+            className="inline-flex items-center justify-center px-4 py-3 bg-purple-600 text-white font-medium rounded-lg shadow-sm hover:bg-purple-700 disabled:bg-purple-400 transition-colors"
+          >
+            {aiLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Running AI Skill Match...
+              </>
+            ) : (
+              "AI Skill Match"
+            )}
+          </button>
         </div>
+
+        {aiActive && aiMessage && (
+          <div className="mb-4 rounded-lg bg-purple-50 border border-purple-200 px-4 py-3 text-sm text-purple-800">
+            {aiMessage}
+          </div>
+        )}
 
         {/* Content */}
         {error ? (

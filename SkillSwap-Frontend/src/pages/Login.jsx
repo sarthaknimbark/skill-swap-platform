@@ -50,7 +50,7 @@ const Login = () => {
           </div>
 
           {/* Form */}
-          <div className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                 Email Address
@@ -94,7 +94,6 @@ const Login = () => {
             <button
               type="submit"
               disabled={isLoading}
-              onClick={handleSubmit}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >
               {isLoading ? (
@@ -106,7 +105,7 @@ const Login = () => {
                 "Sign In"
               )}
             </button>
-          </div>
+          </form>
 
           {/* Links Section */}
           <div className="mt-8 pt-6 border-t border-gray-200">
