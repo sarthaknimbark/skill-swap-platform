@@ -1,14 +1,11 @@
-<<<<<<< HEAD
-fastapi
-uvicorn
-sentence-transformers
-scikit-learn
-numpy
-torch
-=======
 fastapi==0.115.0
 uvicorn==0.30.0
 sentence-transformers==3.0.1
 numpy==1.26.4
 
->>>>>>> e7a15c634a47df4526e6c7e3cc9d4143f4f7122b
+# Used by the older matcher module and sentence-transformers runtime.
+scikit-learn
+torch
+
+# Used by matcher.py to load HF_TOKEN from .env
+python-dotenv

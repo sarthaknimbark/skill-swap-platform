@@ -35,7 +35,13 @@ exports.matchSkills = async (req, res) => {
       error.code === "ENOTFOUND" ||
       error.response?.status >= 502;
 
-    console.error("AI matchSkills error:", error.response?.data || error.message);
+    console.error("AI matchSkills error:", {
+      aiServiceUrl: AI_SERVICE_URL,
+      code: error.code,
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data,
+    });
 
     if (isTimeout || isUnreachable) {
       return res.status(503).json({
