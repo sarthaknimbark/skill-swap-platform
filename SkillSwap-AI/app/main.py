@@ -82,6 +82,12 @@ def build_profile_text(profile: ProfileIn, focus: str = "offered") -> str:
 async def health():
     return {"status": "ok"}
 
+# Some platforms/probes (e.g., Render) may check `HEAD /`.
+# Provide a lightweight root endpoint so those checks don't 404.
+@app.get("/")
+async def root():
+    return {"status": "ok"}
+
 
 @app.post("/match-skills", response_model=MatchResponse)
 async def match_skills(payload: dict) -> MatchResponse:
