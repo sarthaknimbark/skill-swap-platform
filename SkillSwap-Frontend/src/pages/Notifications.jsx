@@ -14,6 +14,10 @@ const Notifications = () => {
   const [total, setTotal] = useState(0);
   const limit = 10;
 
+  // DashboardContext's `user` is a profile document (UserProfile), not the auth `User`.
+  // Backend notifications use `Notification.userId` (the auth User _id), so we must read the correct id.
+  const dashboardUserId = user?.userId?._id || user?._id || user?.id;
+
   // Fetch notifications
   useEffect(() => {
     fetchNotifications();
@@ -21,12 +25,18 @@ const Notifications = () => {
 
   const fetchNotifications = async () => {
     try {
+      if (!dashboardUserId) {
+        setNotifications([]);
+        setTotal(0);
+        return;
+      }
+
       setLoading(true);
       const skip = (page - 1) * limit;
       const isRead = filter === "unread" ? false : filter === "read" ? true : null;
       
       const response = await NotificationService.getAllNotifications(
-        user._id,
+        dashboardUserId,
         limit,
         skip,
         isRead
@@ -52,7 +62,8 @@ const Notifications = () => {
 
   const handleMarkAllAsRead = async () => {
     try {
-      await NotificationService.markAllAsRead(user._id);
+      if (!dashboardUserId) return;
+      await NotificationService.markAllAsRead(dashboardUserId);
       fetchNotifications();
     } catch (error) {
       console.error("Error marking all as read:", error);

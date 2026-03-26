@@ -58,6 +58,7 @@ const ActiveCallModal = ({
     isVideoCall,
     localVideoRef,
     remoteVideoRef,
+    remoteAudioRef,
     isMuted,
     isCameraOff,
     onToggleMute,
@@ -78,6 +79,7 @@ const ActiveCallModal = ({
                 />
             ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center">
+                    <audio ref={remoteAudioRef} autoPlay playsInline />
                     <div className="w-24 h-24 bg-blue-500 rounded-full flex items-center justify-center mb-4">
                         <UserIcon className="w-12 h-12 text-white" />
                     </div>
@@ -179,6 +181,12 @@ const ChatWindow = ({ chat, onBack, onChatDeleted }) => {
     const localStreamRef = useRef(null);
     const localVideoRef = useRef(null);
     const remoteVideoRef = useRef(null);
+    const remoteAudioRef = useRef(null);
+
+    // If offer/ICE arrives before the callee presses "Accept" (and creates the peer connection),
+    // the current code would drop those events. Queue them and apply after setup.
+    const pendingOfferRef = useRef(null); // { callId, callerId, offer }
+    const pendingIceCandidatesRef = useRef([]); // [ { callId, candidate, ... } ]
 
     // ── Helpers ────────────────────────────────────────────────────────────────
     const scrollToBottom = () => {
@@ -242,8 +250,12 @@ const ChatWindow = ({ chat, onBack, onChatDeleted }) => {
 
         // Receive remote stream
         pc.ontrack = (event) => {
-            if (remoteVideoRef.current) {
-                remoteVideoRef.current.srcObject = event.streams[0];
+            if (isVideoCall) {
+                if (remoteVideoRef.current) remoteVideoRef.current.srcObject = event.streams[0];
+            } else {
+                if (remoteAudioRef.current) remoteAudioRef.current.srcObject = event.streams[0];
+                // Some browsers require an explicit play() after attaching the stream.
+                if (remoteAudioRef.current) remoteAudioRef.current.play().catch(() => {});
             }
             setCallStatus('Connected');
         };
@@ -282,6 +294,10 @@ const ChatWindow = ({ chat, onBack, onChatDeleted }) => {
         setCallStatus('');
         setIsMuted(false);
         setIsCameraOff(false);
+
+        pendingOfferRef.current = null;
+        pendingIceCandidatesRef.current = [];
+        if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
     }, []);
 
     // ── Initiate a call ────────────────────────────────────────────────────────
@@ -346,13 +362,41 @@ const ChatWindow = ({ chat, onBack, onChatDeleted }) => {
             setActiveCall({ callId, isVideoCall, otherUserId: callerId, role: 'callee' });
             setIncomingCall(null);
 
-            createPeerConnection(callId, isVideoCall, callerId, true);
+            const pc = createPeerConnection(callId, isVideoCall, callerId, true);
 
             // Update DB
             await CallService.answerCall(callId, true);
 
             // Notify caller via socket
             CallService.notifyCallAccepted(socket, { callId, callerId });
+
+            // Apply any offer/ICE that arrived before the callee accepted.
+            if (pendingOfferRef.current?.callId === callId) {
+                const pendingOffer = pendingOfferRef.current;
+                pendingOfferRef.current = null;
+                await pc.setRemoteDescription(new RTCSessionDescription(pendingOffer.offer));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                CallService.sendAnswer(socket, {
+                    answer,
+                    callerId: pendingOffer.callerId,
+                    callId: pendingOffer.callId,
+                });
+            }
+
+            const queued = pendingIceCandidatesRef.current.filter(c => c.callId === callId);
+            pendingIceCandidatesRef.current = pendingIceCandidatesRef.current.filter(c => c.callId !== callId);
+            for (const candidateData of queued) {
+                if (!pc.remoteDescription) {
+                    pendingIceCandidatesRef.current.push(candidateData);
+                    continue;
+                }
+                try {
+                    await pc.addIceCandidate(new RTCIceCandidate(candidateData.candidate));
+                } catch (e) {
+                    console.error('Error adding queued ICE candidate:', e);
+                }
+            }
 
         } catch (err) {
             console.error('Error accepting call:', err);
@@ -480,7 +524,13 @@ const ChatWindow = ({ chat, onBack, onChatDeleted }) => {
         const handleCallOffer = async (data) => {
             // We're the callee; we already created a peer connection in handleAcceptCall
             const pc = peerConnectionRef.current;
-            if (!pc) return;
+            if (!pc) {
+                pendingOfferRef.current = data;
+                return;
+            }
+
+            // Avoid applying the same offer twice.
+            if (pc.remoteDescription && pc.remoteDescription.type) return;
             try {
                 await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
                 const answer = await pc.createAnswer();
@@ -490,6 +540,17 @@ const ChatWindow = ({ chat, onBack, onChatDeleted }) => {
                     callerId: data.callerId,
                     callId: data.callId
                 });
+
+                // Flush queued ICE candidates now that remote description exists.
+                const queued = pendingIceCandidatesRef.current.filter(c => c.callId === data.callId);
+                pendingIceCandidatesRef.current = pendingIceCandidatesRef.current.filter(c => c.callId !== data.callId);
+                for (const candidateData of queued) {
+                    try {
+                        await pc.addIceCandidate(new RTCIceCandidate(candidateData.candidate));
+                    } catch (e) {
+                        console.error('Error adding queued ICE candidate:', e);
+                    }
+                }
             } catch (err) {
                 console.error('Error handling offer:', err);
             }
@@ -501,6 +562,17 @@ const ChatWindow = ({ chat, onBack, onChatDeleted }) => {
             try {
                 await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
                 setCallStatus('Connected');
+
+                // Flush queued ICE candidates for this call.
+                const queued = pendingIceCandidatesRef.current.filter(c => c.callId === data.callId);
+                pendingIceCandidatesRef.current = pendingIceCandidatesRef.current.filter(c => c.callId !== data.callId);
+                for (const candidateData of queued) {
+                    try {
+                        await pc.addIceCandidate(new RTCIceCandidate(candidateData.candidate));
+                    } catch (e) {
+                        console.error('Error adding queued ICE candidate:', e);
+                    }
+                }
             } catch (err) {
                 console.error('Error handling answer:', err);
             }
@@ -508,7 +580,11 @@ const ChatWindow = ({ chat, onBack, onChatDeleted }) => {
 
         const handleIceCandidate = async (data) => {
             const pc = peerConnectionRef.current;
-            if (!pc || !data.candidate) return;
+            if (!data.candidate) return;
+            if (!pc || !pc.remoteDescription) {
+                pendingIceCandidatesRef.current.push(data);
+                return;
+            }
             try {
                 await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
             } catch (err) {
@@ -690,6 +766,7 @@ const ChatWindow = ({ chat, onBack, onChatDeleted }) => {
                     isVideoCall={activeCall.isVideoCall}
                     localVideoRef={localVideoRef}
                     remoteVideoRef={remoteVideoRef}
+                    remoteAudioRef={remoteAudioRef}
                     isMuted={isMuted}
                     isCameraOff={isCameraOff}
                     onToggleMute={handleToggleMute}
