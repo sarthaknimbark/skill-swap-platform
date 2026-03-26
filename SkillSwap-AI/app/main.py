@@ -1,4 +1,5 @@
 from typing import List, Optional
+import os
 
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -49,7 +50,12 @@ def get_model() -> SentenceTransformer:
     """
     global _model
     if _model is None:
-        _model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        # Smaller model reduces memory usage on low-memory instances (Render, etc).
+        # You can override in environment.
+        model_name = os.getenv(
+            "EMBEDDING_MODEL", "sentence-transformers/paraphrase-MiniLM-L3-v2"
+        )
+        _model = SentenceTransformer(model_name)
     return _model
 
 
@@ -102,11 +108,17 @@ async def match_skills(payload: dict) -> MatchResponse:
     seeker_raw = payload.get("seeker") or {}
     candidates_raw = payload.get("candidates") or []
     top_k_raw = payload.get("top_k", 10)
+    max_candidates_raw = payload.get("max_candidates") or os.getenv("MAX_CANDIDATES", 20)
 
     try:
       top_k = int(top_k_raw)
     except Exception:
       top_k = 10
+
+    try:
+      max_candidates = int(max_candidates_raw)
+    except Exception:
+      max_candidates = 20
 
     if not candidates_raw:
         return MatchResponse(matches=[])
@@ -142,6 +154,9 @@ async def match_skills(payload: dict) -> MatchResponse:
     if not candidates:
         return MatchResponse(matches=[])
 
+    # Cap candidates to prevent memory spikes.
+    candidates = candidates[:max_candidates]
+
     model = get_model()
 
     # Text standing for "what the seeker is looking for"
@@ -154,8 +169,14 @@ async def match_skills(payload: dict) -> MatchResponse:
     if not seeker_offer_text.strip():
         seeker_offer_text = seeker_need_text or "general skills"
 
-    seeker_need_emb = model.encode(seeker_need_text, convert_to_tensor=True)
-    seeker_offer_emb = model.encode(seeker_offer_text, convert_to_tensor=True)
+    # Use NumPy embeddings (not torch tensors) to reduce memory.
+    # With normalize_embeddings=True, dot-product equals cosine similarity.
+    seeker_need_emb = model.encode(
+        seeker_need_text, convert_to_numpy=True, normalize_embeddings=True
+    )  # (dim,)
+    seeker_offer_emb = model.encode(
+        seeker_offer_text, convert_to_numpy=True, normalize_embeddings=True
+    )  # (dim,)
 
     cand_need_texts: list[str] = []
     cand_offer_texts: list[str] = []
@@ -164,21 +185,26 @@ async def match_skills(payload: dict) -> MatchResponse:
         cand_need_texts.append(build_profile_text(c, focus="to_learn"))
         cand_offer_texts.append(build_profile_text(c, focus="offered"))
 
-    cand_need_embs = model.encode(cand_need_texts, convert_to_tensor=True)
-    cand_offer_embs = model.encode(cand_offer_texts, convert_to_tensor=True)
-
-    # Core scores:
     # 1) How well candidate's offered skills match seeker's learning needs
-    need_match_scores = util.cos_sim(seeker_need_emb, cand_offer_embs)[0]
+    cand_offer_embs = model.encode(
+        cand_offer_texts, convert_to_numpy=True, normalize_embeddings=True
+    )  # (n, dim)
+    need_match_scores = cand_offer_embs @ seeker_need_emb  # (n,)
+    del cand_offer_embs
+
     # 2) How well candidate wants to learn what seeker can offer (mutual exchange)
-    mutual_match_scores = util.cos_sim(seeker_offer_emb, cand_need_embs)[0]
+    cand_need_embs = model.encode(
+        cand_need_texts, convert_to_numpy=True, normalize_embeddings=True
+    )  # (n, dim)
+    mutual_match_scores = cand_need_embs @ seeker_offer_emb  # (n,)
+    del cand_need_embs
 
     # Weighted combination
     need_weight = 0.7
     mutual_weight = 0.3
-    combined = need_weight * need_match_scores + mutual_weight * mutual_match_scores
-
-    combined_np = combined.cpu().numpy().astype(float)
+    combined_np = (
+        need_weight * need_match_scores + mutual_weight * mutual_match_scores
+    ).astype(float)
 
     # Sort by score desc, keep top_k
     top_k = min(top_k, len(candidates))
