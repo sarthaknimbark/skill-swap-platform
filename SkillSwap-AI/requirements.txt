@@ -5,7 +5,6 @@ numpy==1.26.4
 
 # Used by the older matcher module and sentence-transformers runtime.
 scikit-learn
-torch
 
 # Used by matcher.py to load HF_TOKEN from .env
 python-dotenv
