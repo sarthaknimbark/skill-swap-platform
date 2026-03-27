@@ -1,200 +1,230 @@
+"""
+Skill-Swap Matcher — prioritises complementary skill overlap.
+
+Matching logic:
+  1. Exact skill overlap  (they teach what you want & you teach what they want)
+  2. Semantic similarity   (bi-encoder + cross-encoder for fuzzy skill matching)
+  3. Bonus signals         (availability, location, experience)
+
+Score is 0–100, higher = better match.
+"""
+
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer, CrossEncoder
 import os
-from dotenv import load_dotenv  
+from dotenv import load_dotenv
 
 load_dotenv()
 
 hf_token = os.getenv("HF_TOKEN")
 
-bi_encoder = SentenceTransformer('all-MiniLM-L6-v2')
-cross_encoder = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
+bi_encoder = SentenceTransformer("all-MiniLM-L6-v2")
+cross_encoder = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
 
 
-def build_skill_text(profile):
+# ── helpers ────────────────────────────────────────────────────────────────
 
-    offers = ", ".join(profile.get("skillsOffered", []))
-    wants  = ", ".join(profile.get("skillsToLearn", []))
-    headline = profile.get("headline", "").strip()
-    about    = profile.get("aboutMe", "").strip()[:200]
-    location = profile.get("location", "").strip()
-    avail    = ", ".join(profile.get("availability", []))
-
-    experience = profile.get("experience", [])
-    exp_text = ""
-    if experience:
-        top = experience[0]
-        title   = top.get("title", "").strip()
-        company = top.get("company", "").strip()
-        if title and company:
-            exp_text = f"Works as {title} at {company}."
-        elif title:
-            exp_text = f"Works as {title}."
-
-    education = profile.get("education", [])
-    edu_text = ""
-    if education:
-        top = education[0]
-        degree      = top.get("degree", "").strip()
-        institution = top.get("institution", "").strip()
-        if degree and institution:
-            edu_text = f"Studied {degree} at {institution}."
-
-    parts = []
-    if offers:   parts.append(f"Teaches and offers: {offers}.")
-    if wants:    parts.append(f"Wants to learn: {wants}.")
-    if headline: parts.append(f"Headline: {headline}.")
-    if about:    parts.append(f"About: {about}.")
-    if exp_text: parts.append(exp_text)
-    if edu_text: parts.append(edu_text)
-    if avail:    parts.append(f"Available: {avail}.")
-    if location: parts.append(f"Location: {location}.")
-
-    return " ".join(parts) if parts else "No profile information."
+def _lower_set(lst):
+    """Normalise a list of strings to a lowercase set."""
+    return set(s.strip().lower() for s in (lst or []) if s.strip())
 
 
-def compute_matches(current_user, all_profiles):
-    if not all_profiles:
-        return []
-    current_text    = build_skill_text(current_user)
-    candidate_texts = [build_skill_text(p) for p in all_profiles]
-
-    current_vec    = bi_encoder.encode([current_text], convert_to_numpy=True)
-    candidate_vecs = bi_encoder.encode(candidate_texts, convert_to_numpy=True, batch_size=64)
-
-    scores      = cosine_similarity(current_vec, candidate_vecs)[0]
-    top_indices = np.argsort(scores)[::-1][:min(50, len(all_profiles))]
-
-    # Step 3: cross-encoder reranks top 50 (slow but accurate)
-    pairs = [
-        [current_text, candidate_texts[i]]
-        for i in top_indices
-    ]
-    cross_scores = cross_encoder.predict(pairs)
-
-    # Step 4: combine transformer score + bonus score → normalize to 0–100
-    results = []
-    for idx, cross_score in sorted(
-        zip(top_indices, cross_scores),
-        key=lambda x: x[1],
-        reverse=True
-    ):
-        profile = all_profiles[idx]
-
-        # Normalize cross-encoder output to 0–1
-        normalized = float(1 / (1 + np.exp(-cross_score * 0.5)))
-
-        # ✅ NEW: bonus from exact field overlap
-        bonus = compute_bonus(current_user, profile)
-
-        # 70% transformer + 30% bonus → scale to 0–100
-        final_score = round(float(np.clip((normalized * 0.7 + bonus * 0.3) * 100, 0, 100)), 1)
-
-        # ✅ FIXED: userId field instead of _id
-        results.append({
-            "userId":  str(profile.get("userId") or profile.get("_id", "")),
-            "score":   final_score,
-            "reasons": generate_reasons(current_user, profile, final_score),
-            # ✅ NEW: matched skills breakdown for frontend badge
-            "matchedSkills": {
-                "theyTeachYou": sorted(
-                    set(s.lower() for s in profile.get("skillsOffered", []))
-                    & set(s.lower() for s in current_user.get("skillsToLearn", []))
-                ),
-                "youTeachThem": sorted(
-                    set(s.lower() for s in current_user.get("skillsOffered", []))
-                    & set(s.lower() for s in profile.get("skillsToLearn", []))
-                ),
-            }
-        })
-
-    return results[:20]
+def _skill_text(skills):
+    """Join skills into a single string for embedding."""
+    return ", ".join(sorted(skills)) if skills else ""
 
 
-def compute_bonus(current_user, candidate):
+# ── core matching ──────────────────────────────────────────────────────────
+
+def compute_skill_overlap(seeker, candidate):
     """
-    Extra signal from exact UserProfile field matches.
-    Returns 0.0 to 1.0, added on top of transformer score.
+    Compute direct (exact) skill overlap score.
+    Returns a dict with breakdown and a 0–1 score.
+    """
+    seeker_offers = _lower_set(seeker.get("skillsOffered", []))
+    seeker_wants  = _lower_set(seeker.get("skillsToLearn", []))
+    cand_offers   = _lower_set(candidate.get("skillsOffered", []))
+    cand_wants    = _lower_set(candidate.get("skillsToLearn", []))
+
+    # They teach what I want to learn
+    they_teach_me = cand_offers & seeker_wants
+    # I teach what they want to learn
+    i_teach_them  = seeker_offers & cand_wants
+
+    # Bidirectional match is the strongest signal
+    total_possible = max(len(seeker_wants) + len(cand_wants), 1)
+    matched = len(they_teach_me) + len(i_teach_them)
+    overlap_score = min(matched / total_possible, 1.0)
+
+    # Give extra weight when BOTH directions match (true swap)
+    if they_teach_me and i_teach_them:
+        overlap_score = min(overlap_score + 0.25, 1.0)
+
+    return {
+        "score": overlap_score,
+        "they_teach_me": they_teach_me,
+        "i_teach_them": i_teach_them,
+    }
+
+
+def build_skill_query(profile):
+    """
+    Build a text representation focused on SKILLS for semantic matching.
+    """
+    parts = []
+    offers = profile.get("skillsOffered", [])
+    wants  = profile.get("skillsToLearn", [])
+    if offers:
+        parts.append(f"Can teach: {', '.join(offers)}")
+    if wants:
+        parts.append(f"Wants to learn: {', '.join(wants)}")
+    headline = (profile.get("headline") or "").strip()
+    if headline:
+        parts.append(headline)
+    about = (profile.get("aboutMe") or "").strip()[:200]
+    if about:
+        parts.append(about)
+    return " | ".join(parts) if parts else "No skills listed."
+
+
+def compute_bonus(seeker, candidate):
+    """
+    Small bonus for availability overlap, location, and experience.
+    Returns 0.0–1.0
     """
     bonus = 0.0
 
-    a_offers = set(s.lower() for s in current_user.get("skillsOffered", []))
-    a_wants  = set(s.lower() for s in current_user.get("skillsToLearn", []))  # ✅ FIXED
-    b_offers = set(s.lower() for s in candidate.get("skillsOffered", []))
-    b_wants  = set(s.lower() for s in candidate.get("skillsToLearn", []))     # ✅ FIXED
-
-    # Bidirectional skill match — strongest signal
-    they_teach_me = b_offers & a_wants
-    i_teach_them  = a_offers & b_wants
-    if they_teach_me:
-        bonus += 0.3 * min(len(they_teach_me), 3) / 3   # up to +0.30
-    if i_teach_them:
-        bonus += 0.3 * min(len(i_teach_them), 3) / 3    # up to +0.30
-
     # Availability overlap
-    a_avail = set(s.lower() for s in current_user.get("availability", []))
-    b_avail = set(s.lower() for s in candidate.get("availability", []))
+    a_avail = _lower_set(seeker.get("availability", []))
+    b_avail = _lower_set(candidate.get("availability", []))
     if a_avail and b_avail and (a_avail & b_avail):
-        bonus += 0.15
+        bonus += 0.10
 
     # Same location
-    a_loc = current_user.get("location", "").strip().lower()
-    b_loc = candidate.get("location", "").strip().lower()
+    a_loc = (seeker.get("location") or "").strip().lower()
+    b_loc = (candidate.get("location") or "").strip().lower()
     if a_loc and b_loc and a_loc == b_loc:
         bonus += 0.10
 
-    # Has time credits (shows active platform user)
+    # Active user indicator
     if candidate.get("timeCredits", 0) > 0:
         bonus += 0.05
 
     return min(bonus, 1.0)
 
 
-def generate_reasons(user_a, user_b, score):
+def compute_matches(current_user, all_profiles):
+    """
+    Main matching pipeline.
+
+    Scoring breakdown (0–100):
+      50%  — exact skill overlap  (they_teach_me + i_teach_them)
+      35%  — semantic similarity   (bi-encoder + cross-encoder)
+      15%  — bonus signals         (availability, location, activity)
+    """
+    if not all_profiles:
+        return []
+
+    # ── Step 1: exact skill overlap ──────────────────────────────────
+    overlaps = []
+    for p in all_profiles:
+        overlaps.append(compute_skill_overlap(current_user, p))
+
+    # ── Step 2: semantic similarity ──────────────────────────────────
+    seeker_text    = build_skill_query(current_user)
+    candidate_texts = [build_skill_query(p) for p in all_profiles]
+
+    seeker_vec     = bi_encoder.encode([seeker_text], convert_to_numpy=True)
+    candidate_vecs = bi_encoder.encode(candidate_texts, convert_to_numpy=True, batch_size=64)
+
+    cos_scores = cosine_similarity(seeker_vec, candidate_vecs)[0]
+
+    # Short-list top 50 by bi-encoder for cross-encoder reranking
+    top_k = min(50, len(all_profiles))
+    top_indices = np.argsort(cos_scores)[::-1][:top_k]
+
+    pairs = [[seeker_text, candidate_texts[i]] for i in top_indices]
+    cross_scores_raw = cross_encoder.predict(pairs)
+
+    # Map cross-encoder scores back
+    cross_map = {}
+    for idx, cs in zip(top_indices, cross_scores_raw):
+        cross_map[idx] = float(1 / (1 + np.exp(-cs * 0.5)))  # sigmoid normalise
+
+    # ── Step 3: combine all signals ──────────────────────────────────
+    results = []
+    for idx, profile in enumerate(all_profiles):
+        overlap = overlaps[idx]
+        semantic = cross_map.get(idx, float(cos_scores[idx]))  # fallback to bi-encoder
+        bonus = compute_bonus(current_user, profile)
+
+        # Weighted combination → scale to 0–100
+        final = (overlap["score"] * 0.50 + semantic * 0.35 + bonus * 0.15) * 100
+        final = round(float(np.clip(final, 0, 100)), 1)
+
+        # Skip profiles with zero skill relevance
+        if final < 5 and not overlap["they_teach_me"] and not overlap["i_teach_them"]:
+            continue
+
+        results.append({
+            "userId":  str(profile.get("userId") or profile.get("_id", "")),
+            "score":   final,
+            "reasons": generate_reasons(current_user, profile, overlap, final),
+            "matchedSkills": {
+                "theyTeachYou": sorted(overlap["they_teach_me"]),
+                "youTeachThem": sorted(overlap["i_teach_them"]),
+            },
+        })
+
+    # Sort by score descending
+    results.sort(key=lambda r: r["score"], reverse=True)
+    return results[:20]
+
+
+def generate_reasons(seeker, candidate, overlap, score):
+    """Human-readable reasons explaining why this is a good match."""
     reasons = []
 
-    a_offers = set(s.lower() for s in user_a.get("skillsOffered", []))
-    a_wants  = set(s.lower() for s in user_a.get("skillsToLearn", []))  # ✅ FIXED
-    b_offers = set(s.lower() for s in user_b.get("skillsOffered", []))
-    b_wants  = set(s.lower() for s in user_b.get("skillsToLearn", []))  # ✅ FIXED
+    if overlap["they_teach_me"]:
+        skills = ", ".join(sorted(overlap["they_teach_me"])[:3])
+        reasons.append(f"They can teach you: {skills}")
 
-    mutual_teach = a_offers & b_wants   # you offer what they want
-    mutual_learn = b_offers & a_wants   # they offer what you want
+    if overlap["i_teach_them"]:
+        skills = ", ".join(sorted(overlap["i_teach_them"])[:3])
+        reasons.append(f"You can teach them: {skills}")
 
-    if mutual_learn:
-        reasons.append(f"They can teach you: {', '.join(sorted(mutual_learn)[:3])}")
-    if mutual_teach:
-        reasons.append(f"You can teach them: {', '.join(sorted(mutual_teach)[:3])}")
+    if overlap["they_teach_me"] and overlap["i_teach_them"]:
+        reasons.append("Perfect two-way skill swap!")
 
-    # ✅ NEW: availability reason
-    a_avail = set(s.lower() for s in user_a.get("availability", []))
-    b_avail = set(s.lower() for s in user_b.get("availability", []))
-    shared_avail = a_avail & b_avail
-    if shared_avail:
-        reasons.append(f"Shared availability: {', '.join(sorted(shared_avail))}")
+    # Availability
+    a_avail = _lower_set(seeker.get("availability", []))
+    b_avail = _lower_set(candidate.get("availability", []))
+    shared = a_avail & b_avail
+    if shared:
+        reasons.append(f"Shared availability: {', '.join(sorted(shared))}")
 
-    # ✅ NEW: location reason
-    a_loc = user_a.get("location", "").strip()
-    b_loc = user_b.get("location", "").strip()
+    # Location
+    a_loc = (seeker.get("location") or "").strip()
+    b_loc = (candidate.get("location") or "").strip()
     if a_loc and b_loc and a_loc.lower() == b_loc.lower():
         reasons.append(f"Same location: {b_loc}")
 
-    # ✅ NEW: experience context from candidate
-    experience = user_b.get("experience", [])
+    # Experience context
+    experience = candidate.get("experience", [])
     if experience:
         top = experience[0]
-        title   = top.get("title", "").strip()
-        company = top.get("company", "").strip()
+        title = (top.get("title") or "").strip()
+        company = (top.get("company") or "").strip()
         if title and company:
             reasons.append(f"Has experience as {title} at {company}")
 
-    # Score-based general reason
+    # Score-based summary
     if score > 80:
-        reasons.append("Very high skill compatibility overall")
+        reasons.append("Excellent skill compatibility")
     elif score > 60:
         reasons.append("Good complementary skill overlap")
-    else:
-        reasons.append("Some overlapping interests in skill areas")
+    elif score > 40:
+        reasons.append("Some matching skill interests")
 
     return reasons

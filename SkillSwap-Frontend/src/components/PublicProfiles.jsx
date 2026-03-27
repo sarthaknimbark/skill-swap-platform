@@ -382,63 +382,46 @@ const PublicProfiles = () => {
       setAiActive(true);
 
       if (!currentUserProfile) {
-        setAiMessage("No profile detected for your preferred skills. Please complete your profile first.");
-        return;
-      }
-
-      if (!profiles.length) {
-        setAiMessage("No profile detected for your preferred skills.");
+        setAiMessage("Please complete your profile first so we can find the best matches for you.");
         return;
       }
 
       setAiLoading(true);
 
-      const toAiProfile = (p) => ({
-        user_id: p.userId?._id || p.userId || p._id,
-        fullname: p.fullname || "",
-        headline: p.headline || "",
-        about_me: p.aboutMe || "",
-        skills_offered: p.skillsOffered || [],
-        skills_to_learn: p.skillsToLearn || [],
-        location: p.location || "",
-      });
-
-      const seeker = toAiProfile(currentUserProfile);
-      const candidates = profiles.map(toAiProfile);
-
-      const result = await matchSkills({
-        seeker,
-        candidates,
-        top_k: 1, // only keep the single best-matched profile
-      });
+      // Backend fetches ALL profiles from the database — we just specify how many results
+      const result = await matchSkills({ top_k: 6 });
 
       if (!result.matches || !result.matches.length) {
-        setAiMessage("No profile detected for your preferred skills.");
+        setAiMessage("No matching profiles found for your skills.");
         return;
       }
 
-      // Build a lookup for profiles by user id
-      const byUserId = new Map();
-      profiles.forEach((p) => {
-        const uid = p.userId?._id || p.userId || p._id;
-        if (uid) byUserId.set(String(uid), p);
-      });
-
-      const rankedProfiles = result.matches
-        .map((m) => {
-          const base = byUserId.get(String(m.user_id));
-          if (!base) return null;
-          return { ...base, aiScore: m.score };
-        })
-        .filter(Boolean);
+      // Fetch full profile data for each matched user (they may not be on the current page)
+      const rankedProfiles = [];
+      for (const match of result.matches) {
+        try {
+          const response = await UserProfileService.getProfileByUserId(match.user_id || match.userId);
+          const profile = response?.data || response;
+          if (profile && profile.fullname) {
+            rankedProfiles.push({
+              ...profile,
+              aiScore: match.score,
+              aiReasons: match.reasons || [],
+              aiMatchedSkills: match.matchedSkills || {},
+            });
+          }
+        } catch {
+          // Profile may have been deleted; skip it
+        }
+      }
 
       if (!rankedProfiles.length) {
-        setAiMessage("No profile detected for your preferred skills.");
+        setAiMessage("No matching profiles found for your skills.");
         return;
       }
 
       setProfiles(rankedProfiles);
-      setAiMessage("");
+      setAiMessage(`Found ${rankedProfiles.length} best match${rankedProfiles.length > 1 ? "es" : ""} across all users.`);
     } catch (err) {
       console.error("AI Skill Match error:", err);
       const msg = err.response?.data?.message || err.response?.data?.details;
@@ -455,7 +438,7 @@ const PublicProfiles = () => {
     } finally {
       setAiLoading(false);
     }
-  }, [currentUserProfile, profiles]);
+  }, [currentUserProfile]);
 
   // Computed values
   const isFirstLoad = isLoading && profiles.length === 0 && !error;
