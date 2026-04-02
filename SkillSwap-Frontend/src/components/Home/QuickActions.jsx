@@ -1,41 +1,44 @@
 import {
-  Calendar,
   Search,
-  Briefcase,
   ChevronRight,
-  Star,
+  MessageSquare,
+  BarChart2,
+  GitPullRequest
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 // Quick Actions Component
 const QuickActions = () => {
+  const navigate = useNavigate();
+
   const actions = [
     {
       icon: Search,
       title: "Find People",
       description: "Discover and connect with professionals",
       color: "blue",
-      href: "/search"
+      href: "/public-profiles"
     },
     {
-      icon: Briefcase,
-      title: "Job Opportunities",
-      description: "Explore career opportunities",
+      icon: GitPullRequest,
+      title: "Swap Requests",
+      description: "Manage your skill connection requests",
       color: "green",
-      href: "/jobs"
+      href: "/requests"
     },
     {
-      icon: Calendar,
-      title: "Schedule Meeting",
-      description: "Book a call with connections",
+      icon: MessageSquare,
+      title: "Messages",
+      description: "Chat with your connections",
       color: "purple",
-      href: "/calendar"
+      href: "/chat"
     },
     {
-      icon: Star,
-      title: "Recommendations",
-      description: "Give and receive recommendations",
+      icon: BarChart2,
+      title: "Platform Stats",
+      description: "View community insights and statistics",
       color: "yellow",
-      href: "/recommendations"
+      href: "/stats"
     }
   ];
 
@@ -56,10 +59,9 @@ const QuickActions = () => {
         {actions.map((action, index) => (
           <button
             key={index}
-            className={`p-4 rounded-lg border transition-colors text-left group ${getColorClasses(action.color)}`}
+            className={`p-4 rounded-lg border transition-colors text-left group cursor-pointer ${getColorClasses(action.color)}`}
             onClick={() => {
-              // Handle navigation or action
-              console.log(`Navigate to ${action.href}`);
+              navigate(action.href);
             }}
           >
             <action.icon className="h-6 w-6 mb-3" />
