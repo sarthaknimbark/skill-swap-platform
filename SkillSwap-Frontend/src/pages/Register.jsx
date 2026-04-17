@@ -22,7 +22,7 @@ const Register = () => {
     setError("");
     setSuccess("");
     setIsLoading(true);
-    
+
     try {
       const res = await register(form);
       setSuccess("User registered successfully!");

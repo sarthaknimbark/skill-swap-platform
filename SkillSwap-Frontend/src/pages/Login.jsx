@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom"; 
+import { useNavigate } from "react-router-dom";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -20,12 +20,12 @@ const Login = () => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
-    
+
     try {
-      const userInfo = await login(form); 
+      const userInfo = await login(form);
       console.log(userInfo);
-      
-      
+
+
       if (userInfo.hasProfile) {
         navigate("/dashboard");
       } else {
@@ -121,7 +121,7 @@ const Login = () => {
                 className="text-gray-600 hover:text-gray-800 font-medium underline decoration-2 underline-offset-2 hover:decoration-gray-800 transition-all duration-200"
               >
                 Need Help?
-              </button>     
+              </button>
             </div>
           </div>
         </div>
