@@ -1,10 +1,10 @@
 // components/Home/HeaderNavigation.jsx
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { 
-  UsersIcon, 
-  ChartBarIcon, 
-  LightningBoltIcon, 
+import {
+  UsersIcon,
+  ChartBarIcon,
+  LightningBoltIcon,
   BellIcon,
   UserIcon,
   LogoutIcon,
@@ -50,22 +50,21 @@ const HeaderNavigation = ({ user }) => {
                 <img src="/src/assets/ss.png" alt="Skill Swap" className="h-20 w-auto" />
               </Link>
             </div>
-            
+
             {/* Desktop navigation */}
             <div className="hidden sm:ml-8 sm:flex sm:items-center sm:space-x-1">
               {navigationItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.href;
-                
+
                 return (
                   <Link
                     key={item.name}
                     to={item.href}
-                    className={`inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      isActive
+                    className={`inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive
                         ? 'bg-blue-600 text-white shadow'
                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                    }`}
+                      }`}
                   >
                     <Icon className="w-5 h-5 mr-2" />
                     {item.name}
@@ -85,7 +84,7 @@ const HeaderNavigation = ({ user }) => {
                 <UserIcon className="w-5 h-5 mr-2" />
                 <span className="text-sm font-medium">{user?.fullname || user?.name}</span>
               </Link>
-              
+
               <button
                 onClick={handleLogout}
                 className="flex items-center px-3 py-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
@@ -119,16 +118,15 @@ const HeaderNavigation = ({ user }) => {
             {navigationItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.href;
-              
+
               return (
                 <Link
                   key={item.name}
                   to={item.href}
-                  className={`flex items-center px-4 py-3 text-base font-medium ${
-                    isActive
+                  className={`flex items-center px-4 py-3 text-base font-medium ${isActive
                       ? 'bg-blue-50 text-blue-700'
                       : 'text-gray-700 hover:bg-gray-50'
-                  }`}
+                    }`}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   <Icon className="w-5 h-5 mr-3" />
@@ -137,7 +135,7 @@ const HeaderNavigation = ({ user }) => {
               );
             })}
           </div>
-          
+
           <div className="pt-4 pb-3 border-t border-gray-200">
             <div className="flex items-center px-4">
               <div className="text-base font-medium text-gray-800">

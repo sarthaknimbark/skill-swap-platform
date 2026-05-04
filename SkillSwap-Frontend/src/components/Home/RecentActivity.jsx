@@ -24,7 +24,7 @@ const RecentActivity = ({ activities }) => {
           View All
         </button>
       </div>
-      
+
       <div className="space-y-4">
         {activities.length === 0 ? (
           <p className="text-sm text-gray-500">No recent activity to display.</p>

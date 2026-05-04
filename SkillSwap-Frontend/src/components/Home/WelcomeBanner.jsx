@@ -4,7 +4,7 @@ import { User } from "lucide-react";
 const WelcomeBanner = ({ user }) => {
   const currentHour = new Date().getHours();
   const greeting = currentHour < 12 ? "Good morning" : currentHour < 18 ? "Good afternoon" : "Good evening";
-  
+
   return (
     <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 mb-8 text-white">
       <div className="flex items-center justify-between">

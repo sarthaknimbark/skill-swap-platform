@@ -61,9 +61,12 @@ const Dashboard = () => {
       <WelcomeBanner user={user} />
 
       {loading ? (
-        <div className="mt-8 text-center text-gray-600">Loading your dashboard...</div>
+        <div className="mt-8 text-center text-slate-400">
+          <div className="gradient-spinner mx-auto mb-4"></div>
+          Loading your dashboard...
+        </div>
       ) : error ? (
-        <div className="mt-8 text-red-600">{error}</div>
+        <div className="mt-8 text-rose-400 glass-card p-6 text-center">{error}</div>
       ) : (
         <>
           {/* Top row: snapshot of your activity */}
@@ -73,20 +76,20 @@ const Dashboard = () => {
             {/* Recommended connections preview */}
             <section className="lg:col-span-2">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">
+                <h2 className="text-xl font-semibold text-white">
                   Recommended Connections
                 </h2>
                 <a
                   href="/public-profiles"
-                  className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                  className="text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors duration-300"
                 >
                   View all
                 </a>
               </div>
 
               {recommended.length === 0 ? (
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-                  <p className="text-sm text-gray-600">
+                <div className="glass-card p-6">
+                  <p className="text-sm text-slate-400">
                     No recommended profiles yet. Try updating your skills and interests to get better matches.
                   </p>
                 </div>
