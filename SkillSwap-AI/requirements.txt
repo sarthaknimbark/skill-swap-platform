@@ -8,3 +8,4 @@ scikit-learn
 
 # Used by matcher.py to load HF_TOKEN from .env
 python-dotenv
+codecarbon

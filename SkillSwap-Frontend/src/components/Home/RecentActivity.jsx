@@ -2,6 +2,20 @@ import { Activity } from "lucide-react";
 
 // Recent Activity Component
 const RecentActivity = ({ activities }) => {
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString; // fallback if invalid
+
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
   return (
     <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-8">
       <div className="flex items-center justify-between mb-4">
@@ -24,7 +38,7 @@ const RecentActivity = ({ activities }) => {
               </div>
               <div className="flex-1">
                 <p className="text-sm text-gray-900">{activity.message}</p>
-                <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
+                <p className="text-xs text-gray-500 mt-1">{formatDate(activity.time)}</p>
               </div>
             </div>
           ))

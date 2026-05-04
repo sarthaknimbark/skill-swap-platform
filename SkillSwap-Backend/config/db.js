@@ -1,11 +1,10 @@
 const mongoose = require('mongoose');
+const dns = require('dns');
+dns.setServers(['8.8.8.8', '1.1.1.1']);
 mongoose.set('strictQuery', true);
 
 const connectToDB = () => {
-    mongoose.connect(process.env.MONGO_URL, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-    })
+    mongoose.connect(process.env.MONGO_URL)
     .then(() => {
         console.log('Connected to MongoDB successfully');
     })
